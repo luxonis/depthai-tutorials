@@ -9,17 +9,19 @@ if not depthai.init_device(consts.resource_paths.device_cmd_fpath):
     exit(1)
 
 # Create the pipeline using the 'metaout' and 'previewout' streams, establishing the first connection to the device.
-p = depthai.create_pipeline({
-{
-    'streams': ['metaout','previewout'],
-    'ai':
+p = depthai.create_pipeline(
     {
-        # The paths below are based on the tutorial steps.
-        'blob_file': "/home/pi/open_model_zoo_downloads/Retail/object_detection/face/sqnet1.0modif-ssd/0004/dldt/FP16/face-detection-retail-0004.blob",
-        'blob_file_config': "/home/pi/open_model_zoo_downloads/Retail/object_detection/face/sqnet1.0modif-ssd/0004/dldt/FP16/face-detection-retail-0004.json"
+        # metaout - contains neural net output
+        # previewout - color video
+        'streams': ['metaout','previewout'],
+        'ai':
+        {
+            # The paths below are based on the tutorial steps.
+            'blob_file': "/home/pi/open_model_zoo_downloads/Retail/object_detection/face/sqnet1.0modif-ssd/0004/dldt/FP16/face-detection-retail-0004.blob",
+            'blob_file_config': "/home/pi/open_model_zoo_downloads/Retail/object_detection/face/sqnet1.0modif-ssd/0004/dldt/FP16/face-detection-retail-0004.json"
+        }
     }
-}
-})
+)
 
 if p is None:
     print('Pipeline was not created.')
@@ -63,7 +65,8 @@ while True:
             # iterate threw pre-saved entries & draw rectangle on image:
             for e in entries_prev:
                 # The lower confidence threshold, the more false positives
-                if e['conf'] > 0.7:
+                # label == 1.0 is a face
+                if e['label'] == 1.0 and e['conf'] > 0.5:
                     # Determine rectangle bounds, then draw the image on the frame.
                     x1 = int(e['x_min'] * img_w)
                     y1 = int(e['y_max'] * img_h)
@@ -71,6 +74,10 @@ while True:
                     pt1 = x1, y1
                     pt2 = int(e['x_max'] * img_w), int(e['y_min'] * img_h)
                     cv2.rectangle(frame, pt1, pt2, (0, 0, 255))
+
+                    pt_t1 = x1, y1 + 20
+                    conf_text = "{:.2f}%".format(e['conf'] * 100)
+                    cv2.putText(frame, conf_text, pt_t1, cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 255))
 
             frame = cv2.resize(frame, (300, 300))
             cv2.imshow('previewout', frame)
