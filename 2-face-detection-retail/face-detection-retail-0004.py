@@ -2,6 +2,9 @@ import numpy as np # numpy - manipulate the packet data returned by depthai
 import cv2 # opencv - display the video stream
 import depthai # access the camera and its data packets
 import consts.resource_paths # load paths to depthai resources
+import os # for debugging
+
+DEBUG = os.getenv("DEBUG",False)
 
 # Load the device cmd file
 if not depthai.init_device(consts.resource_paths.device_cmd_fpath):
@@ -38,10 +41,11 @@ while True:
     for i, nnet_packet in enumerate(nnet_packets):
         # https://docs.openvinotoolkit.org/latest/_models_intel_face_detection_retail_0004_description_face_detection_retail_0004.html#outputs
         # Shape: [1, 1, N, 7], where N is the number of detected bounding boxes
+        if DEBUG:
+            res = filter(lambda e: int(e[0]['label']) == 1, nnet_packet.entries())
+            res = map(lambda e: "label="+ str(int(e[0]['label'])) + " conf=" + str(e[0]['conf']) + " x_min=" + str(e[0]['x_min']), res)
+            print(list(res))
         for i, e in enumerate(nnet_packet.entries()):
-            if e[0]['conf'] == 0.0:
-                break
-
             # Clear previous detections if this is the first new detection.
             if i == 0:
                 entries_prev.clear()
