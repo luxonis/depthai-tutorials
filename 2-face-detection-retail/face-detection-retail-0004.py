@@ -17,8 +17,8 @@ p = depthai.create_pipeline(
         'ai':
         {
             # The paths below are based on the tutorial steps.
-            'blob_file': "/home/pi/open_model_zoo_downloads/Retail/object_detection/face/sqnet1.0modif-ssd/0004/dldt/FP16/face-detection-retail-0004.blob",
-            'blob_file_config': "/home/pi/open_model_zoo_downloads/Retail/object_detection/face/sqnet1.0modif-ssd/0004/dldt/FP16/face-detection-retail-0004.json"
+            'blob_file': "face-detection-retail-0004.blob",
+            'blob_file_config': "face-detection-retail-0004.json"
         }
     }
 )
