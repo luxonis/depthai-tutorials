@@ -24,7 +24,7 @@ while True:
 
     for packet in data_packets:
           data = packet.getData()
-          print("Received %s packet with shape=%s" % packet.stream_name, str(data.shape))
+          print("Received %s packet with shape=%s" % (packet.stream_name, str(data.shape)))
 
     if cv2.waitKey(1) == ord('q'):
         break
