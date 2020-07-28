@@ -11,7 +11,7 @@
                 [],
                 [],
                 [],
-                ["image_id", "label", "conf", "x_min", "y_min", "x_max", "y_max"]
+                ["id", "label", "confidence", "left", "top", "right", "bottom"]
             ],
             "output_properties_type": "f16"
         }
