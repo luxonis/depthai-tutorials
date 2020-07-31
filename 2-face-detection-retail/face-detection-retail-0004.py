@@ -14,8 +14,8 @@ pipeline = depthai.create_pipeline(config={
     'streams': ['previewout', 'metaout'],
     'ai': {
         # The paths below are based on the tutorial steps.
-        "blob_file": str((Path(__file__) / Path("face-detection-retail-0004.bin")).absolute()),
-        "blob_file_config": str((Path(__file__) / Path("face-detection-retail-0004.json")).absolute()),
+        "blob_file": str((Path(__file__).parent / Path("face-detection-retail-0004.bin")).absolute()),
+        "blob_file_config": str((Path(__file__).parent / Path("face-detection-retail-0004.json")).absolute()),
     }
 })
 
