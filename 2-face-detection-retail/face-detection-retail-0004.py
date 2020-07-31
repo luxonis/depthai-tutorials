@@ -4,21 +4,18 @@ import numpy as np  # numpy - manipulate the packet data returned by depthai
 import cv2  # opencv - display the video stream
 import depthai  # access the camera and its data packets
 import consts.resource_paths  # load paths to depthai resources
-import os
-import sys
+from pathlib import Path
 
 if not depthai.init_device(consts.resource_paths.device_cmd_fpath):
     raise RuntimeError("Error initializing device. Try to reset it.")
-
-sample_root = os.path.dirname(os.path.abspath(sys.argv[0]))
 
 # Create the pipeline using the 'previewout' stream, establishing the first connection to the device.
 pipeline = depthai.create_pipeline(config={
     'streams': ['previewout', 'metaout'],
     'ai': {
         # The paths below are based on the tutorial steps.
-        "blob_file": "%s/face-detection-retail-0004.bin" % sample_root,
-        "blob_file_config": "%s/face-detection-retail-0004.json" % sample_root,
+        "blob_file": str((Path(__file__) / Path("face-detection-retail-0004.bin")).absolute()),
+        "blob_file_config": str((Path(__file__) / Path("face-detection-retail-0004.json")).absolute()),
     }
 })
 
