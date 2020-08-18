@@ -6,14 +6,12 @@ from uuid import uuid4
 import consts.resource_paths
 import cv2
 import depthai
-import numpy as np
 
 if not depthai.init_device(consts.resource_paths.device_cmd_fpath):
     raise RuntimeError("Error initializing device. Try to reset it.")
 
 parser = argparse.ArgumentParser()
 parser.add_argument('-t', '--threshold', default=0.03, type=float, help="Maximum difference between packet timestamps to be considered as synced")
-parser.add_argument('-f', '--fps', default=30, type=int, help="FPS of the cameras")
 parser.add_argument('-p', '--path', default="data", type=str, help="Path where to store the captured data")
 parser.add_argument('-d', '--dirty', action='store_true', default=False, help="Allow the destination path not to be empty")
 args = parser.parse_args()
@@ -24,19 +22,13 @@ if dest.exists() and len(list(dest.glob('*'))) != 0 and not args.dirty:
 dest.mkdir(parents=True, exist_ok=True)
 
 p = depthai.create_pipeline(config={
-    "streams": [
-        "left", "right", "previewout"
-        # {'name': 'left', 'max_fps': args.fps},
-        # {'name': 'right', 'max_fps': args.fps},
-        # {'name': 'previewout', 'max_fps': args.fps},
-        # {'name': 'disparity_color', 'max_fps': 2.0},
-    ],
+    "streams": ["left", "right", "previewout"],
     'depth':
     {
         'calibration_file': consts.resource_paths.calib_fpath,
         'padding_factor': 0.3,
-        'depth_limit_m': 10.0, # In meters, for filtering purpose during x,y,z calc
-        'confidence_threshold' : 0.5, #Depth is calculated for bounding boxes with confidence higher than this number
+        'depth_limit_m': 10.0,
+        'confidence_threshold' : 0.5,
     },
     "ai": {
         "blob_file": consts.resource_paths.blob_fpath,
