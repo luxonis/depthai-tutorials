@@ -15,10 +15,10 @@ args = parser.parse_args()
 
 p = depthai.create_pipeline(config={
     "streams": [
-        # "left", "right", "previewout"
-        {'name': 'left', 'max_fps': args.fps},
-        {'name': 'right', 'max_fps': args.fps},
-        {'name': 'previewout', 'max_fps': args.fps},
+        "left", "right", "previewout"
+        # {'name': 'left', 'max_fps': args.fps},
+        # {'name': 'right', 'max_fps': args.fps},
+        # {'name': 'previewout', 'max_fps': args.fps},
         # {'name': 'disparity_color', 'max_fps': 2.0},
     ],
     'depth':
@@ -59,12 +59,20 @@ while True:
             frame = packet.getData()
         else:
             continue
-        latest_packets[packet.stream_name] = {'frame': frame, 'packet': packet}
-        timestamps = np.array([item['packet'].getMetadata().getTimestamp() for item in latest_packets.values()])
-        if len(timestamps) == 3 and np.amax(timestamps - np.amin(timestamps)) < args.threshold:
-            for item in latest_packets.values():
-                cv2.imshow(item['packet'].stream_name, item['frame'])
 
+        if packet.stream_name == "left":
+            latest_packets['left'] = {'frame': frame, 'packet': packet}
+            latest_packets.pop('right', None)
+            latest_packets.pop('previewout', None)
+        elif packet.stream_name == "right" and 'left' in latest_packets and packet.getMetadata().getSequenceNum() == latest_packets['left']['packet'].getMetadata().getSequenceNum():
+            latest_packets['right'] = {'frame': frame, 'packet': packet}
+        elif packet.stream_name == 'previewout' and 'left' in latest_packets and abs(packet.getMetadata().getTimestamp() - latest_packets['left']['packet'].getMetadata().getTimestamp()) < args.threshold:
+            latest_packets["previewout"] = {'frame': frame, 'packet': packet}
+
+        if len(latest_packets) == 3:
+            for key, value in list(latest_packets.items()):
+                cv2.imshow(value['packet'].stream_name, value['frame'])
+                latest_packets.pop(key, None)
 
     if cv2.waitKey(1) == ord('q'):
         break
