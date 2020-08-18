@@ -9,7 +9,7 @@ if not depthai.init_device(consts.resource_paths.device_cmd_fpath):
     raise RuntimeError("Error initializing device. Try to reset it.")
 
 parser = argparse.ArgumentParser()
-parser.add_argument('-t', '--threshold', default=0.5, type=float, help="Maximum difference between packet timestamps to be considered as synced")
+parser.add_argument('-t', '--threshold', default=0.1, type=float, help="Maximum difference between packet timestamps to be considered as synced")
 parser.add_argument('-f', '--fps', default=30, type=int, help="FPS of the cameras")
 args = parser.parse_args()
 
@@ -42,7 +42,16 @@ p = depthai.create_pipeline(config={
 if p is None:
     raise RuntimeError("Error initializing pipelne")
 
-latest_packets = {}
+latest_left = None
+lr_pairs = {}
+
+# https://stackoverflow.com/a/7859208/5494277
+def step_norm(value):
+    return round(value / args.threshold) * args.threshold
+def seq(packet):
+    return packet.getMetadata().getSequenceNum()
+def tst(packet):
+    return packet.getMetadata().getTimestamp()
 
 while True:
     data_packets = p.get_available_data_packets()
@@ -61,18 +70,20 @@ while True:
             continue
 
         if packet.stream_name == "left":
-            latest_packets['left'] = {'frame': frame, 'packet': packet}
-            latest_packets.pop('right', None)
-            latest_packets.pop('previewout', None)
-        elif packet.stream_name == "right" and 'left' in latest_packets and packet.getMetadata().getSequenceNum() == latest_packets['left']['packet'].getMetadata().getSequenceNum():
-            latest_packets['right'] = {'frame': frame, 'packet': packet}
-        elif packet.stream_name == 'previewout' and 'left' in latest_packets and abs(packet.getMetadata().getTimestamp() - latest_packets['left']['packet'].getMetadata().getTimestamp()) < args.threshold:
-            latest_packets["previewout"] = {'frame': frame, 'packet': packet}
-
-        if len(latest_packets) == 3:
-            for key, value in list(latest_packets.items()):
-                cv2.imshow(value['packet'].stream_name, value['frame'])
-                latest_packets.pop(key, None)
+            latest_left = packet
+        elif packet.stream_name == "right" and latest_left is not None and seq(latest_left) == seq(packet):
+            lr_pairs[step_norm(tst(packet))] = (latest_left, packet)
+        elif packet.stream_name == 'previewout':
+            timestamp_normalized = step_norm(tst(packet))
+            pair = lr_pairs.pop(timestamp_normalized, None)
+            if pair is not None:
+                cv2.imshow('left', pair[0].getData())
+                cv2.imshow('right', pair[1].getData())
+                cv2.imshow('previewout', frame)
+            else:
+                for key in list(lr_pairs.keys()):
+                    if key < timestamp_normalized:
+                        del lr_pairs[key]
 
     if cv2.waitKey(1) == ord('q'):
         break
