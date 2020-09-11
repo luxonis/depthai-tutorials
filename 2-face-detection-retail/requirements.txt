@@ -1,3 +1,3 @@
 numpy
 opencv-python
-depthai # Not available via `pip install depthai`. See https://docs.luxonis.com/api/#install for instructions.
+depthai
