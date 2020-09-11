@@ -1,17 +1,17 @@
+from pathlib import Path
+
 import numpy as np  # numpy - manipulate the packet data returned by depthai
 import cv2  # opencv - display the video stream
 import depthai  # access the camera and its data packets
-import consts.resource_paths  # load paths to depthai resources
 
-if not depthai.init_device(consts.resource_paths.device_cmd_fpath):
-    raise RuntimeError("Error initializing device. Try to reset it.")
+device = depthai.Device('', False)
 
 # Create the pipeline using the 'previewout' stream, establishing the first connection to the device.
-pipeline = depthai.create_pipeline(config={
+pipeline = device.create_pipeline(config={
     'streams': ['previewout', 'metaout'],
     'ai': {
-        "blob_file": consts.resource_paths.blob_fpath,
-        "blob_file_config": consts.resource_paths.blob_config_fpath,
+        "blob_file": str(Path('./mobilenet-ssd/mobilenet-ssd.blob').resolve().absolute()),
+        "blob_file_config": str(Path('./mobilenet-ssd/mobilenet-ssd.json').resolve().absolute()),
     }
 })
 
