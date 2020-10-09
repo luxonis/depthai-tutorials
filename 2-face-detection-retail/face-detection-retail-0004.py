@@ -1,21 +1,17 @@
-#!/usr/bin/python3
+from pathlib import Path
 
 import numpy as np  # numpy - manipulate the packet data returned by depthai
 import cv2  # opencv - display the video stream
 import depthai  # access the camera and its data packets
-import consts.resource_paths  # load paths to depthai resources
-from pathlib import Path
 
-if not depthai.init_device(consts.resource_paths.device_cmd_fpath):
-    raise RuntimeError("Error initializing device. Try to reset it.")
+device = depthai.Device('', False)
 
 # Create the pipeline using the 'previewout' stream, establishing the first connection to the device.
-pipeline = depthai.create_pipeline(config={
+pipeline = device.create_pipeline(config={
     'streams': ['previewout', 'metaout'],
     'ai': {
-        # The paths below are based on the tutorial steps.
-        "blob_file": str((Path(__file__).parent / Path("face-detection-retail-0004.bin")).absolute()),
-        "blob_file_config": str((Path(__file__).parent / Path("face-detection-retail-0004.json")).absolute()),
+        "blob_file": str(Path("./face-detection-retail-0004.blob").resolve().absolute()),
+        "blob_file_config": str(Path("./face-detection-retail-0004.json").resolve().absolute()),
     }
 })
 
@@ -31,11 +27,20 @@ while True:
 
     for _, nnet_packet in enumerate(nnet_packets):
         entries_prev = []
-        for _, e in enumerate(nnet_packet.entries()):
-            if e[0]['id'] == -1.0 or e[0]['confidence'] == 0.0:
+        for _, e in enumerate(nnet_packet.get_tensor(0)[0][0]):
+            item = {
+                "id": e[0],
+                "label": e[1],
+                "confidence": e[2],
+                "x_min": e[3],
+                "y_min": e[4],
+                "x_max": e[5],
+                "y_max": e[6]
+            }
+            if item['id'] == -1.0 or item['confidence'] == 0.0:
                 break
-            if e[0]['confidence'] > 0.5:
-                entries_prev.append(e[0])
+            if item['confidence'] > 0.5:
+                entries_prev.append(item)
 
     for packet in data_packets:
         # By default, DepthAI adds other streams (notably 'meta_2dh'). Only process `previewout`.
@@ -51,8 +56,8 @@ while True:
             img_w = frame.shape[1]
 
             for e in entries_prev:
-                pt1 = int(e['left'] * img_w), int(e['top'] * img_h)
-                pt2 = int(e['right'] * img_w), int(e['bottom'] * img_h)
+                pt1 = int(e['x_min'] * img_w), int(e['y_min'] * img_h)
+                pt2 = int(e['x_max'] * img_w), int(e['y_max'] * img_h)
 
                 cv2.rectangle(frame, pt1, pt2, (0, 0, 255), 2)
 
@@ -64,3 +69,4 @@ while True:
 # The pipeline object should be deleted after exiting the loop. Otherwise device will continue working.
 # This is required if you are going to add code after exiting the loop.
 del pipeline
+del device
