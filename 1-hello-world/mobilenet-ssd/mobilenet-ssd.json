@@ -1,7 +1,8 @@
 {
     "NN_config": {
         "output_format" : "detection",
-        "NN_family" : "mobilenet"
+        "NN_family" : "mobilenet",
+        "depth_confidence" : 0.5
     }
 }
 

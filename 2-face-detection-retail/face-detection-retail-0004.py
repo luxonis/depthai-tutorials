@@ -26,7 +26,7 @@ while True:
     nnet_packets, data_packets = pipeline.get_available_nnet_and_data_packets()
 
     for _, nnet_packet in enumerate(nnet_packets):
-        entries_prev = [obj for obj in nnet_packet.getDetectedObjects() if obj.confidence > 0.5]
+        entries_prev = list(nnet_packet.getDetectedObjects())
 
     for packet in data_packets:
         # By default, DepthAI adds other streams (notably 'meta_2dh'). Only process `previewout`.
