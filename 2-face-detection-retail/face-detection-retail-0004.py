@@ -18,15 +18,15 @@ pipeline = device.create_pipeline(config={
 if pipeline is None:
     raise RuntimeError('Pipeline creation failed!')
 
-entries_prev = []
+detections = []
 
 while True:
     # Retrieve data packets from the device.
     # A data packet contains the video frame data.
     nnet_packets, data_packets = pipeline.get_available_nnet_and_data_packets()
 
-    for _, nnet_packet in enumerate(nnet_packets):
-        entries_prev = list(nnet_packet.getDetectedObjects())
+    for nnet_packet in nnet_packets:
+        detections = list(nnet_packet.getDetectedObjects())
 
     for packet in data_packets:
         # By default, DepthAI adds other streams (notably 'meta_2dh'). Only process `previewout`.
@@ -41,7 +41,7 @@ while True:
             img_h = frame.shape[0]
             img_w = frame.shape[1]
 
-            for e in entries_prev:
+            for e in detections:
                 pt1 = int(e.x_min * img_w), int(e.y_min * img_h)
                 pt2 = int(e.x_max * img_w), int(e.y_max * img_h)
 
@@ -52,7 +52,4 @@ while True:
     if cv2.waitKey(1) == ord('q'):
         break
 
-# The pipeline object should be deleted after exiting the loop. Otherwise device will continue working.
-# This is required if you are going to add code after exiting the loop.
-del pipeline
 del device

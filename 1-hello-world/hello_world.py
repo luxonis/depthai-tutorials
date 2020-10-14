@@ -18,7 +18,7 @@ pipeline = device.create_pipeline(config={
 if pipeline is None:
     raise RuntimeError('Pipeline creation failed!')
 
-entries_prev = []
+detections = []
 
 while True:
     # Retrieve data packets from the device.
@@ -26,7 +26,7 @@ while True:
     nnet_packets, data_packets = pipeline.get_available_nnet_and_data_packets()
 
     for nnet_packet in nnet_packets:
-        entries_prev = list(nnet_packet.getDetectedObjects())
+        detections = list(nnet_packet.getDetectedObjects())
 
     for packet in data_packets:
         # By default, DepthAI adds other streams (notably 'meta_2dh'). Only process `previewout`.
@@ -41,9 +41,9 @@ while True:
             img_h = frame.shape[0]
             img_w = frame.shape[1]
 
-            for e in entries_prev:
-                pt1 = int(e.x_min * img_w), int(e.y_min * img_h)
-                pt2 = int(e.x_max * img_w), int(e.y_max * img_h)
+            for detection in detections:
+                pt1 = int(detection.x_min * img_w), int(detection.y_min * img_h)
+                pt2 = int(detection.x_max * img_w), int(detection.y_max * img_h)
 
                 cv2.rectangle(frame, pt1, pt2, (0, 0, 255), 2)
 
@@ -54,4 +54,4 @@ while True:
 
 # The pipeline object should be deleted after exiting the loop. Otherwise device will continue working.
 # This is required if you are going to add code after exiting the loop.
-del pipeline
+del device
