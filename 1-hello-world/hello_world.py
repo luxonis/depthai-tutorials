@@ -1,6 +1,5 @@
 from pathlib import Path
 
-import numpy as np  # numpy - manipulate the packet data returned by depthai
 import cv2  # opencv - display the video stream
 import depthai  # access the camera and its data packets
 
