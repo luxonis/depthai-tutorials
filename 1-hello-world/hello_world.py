@@ -10,8 +10,6 @@ pipeline = depthai.Pipeline()
 # First, we want the Color camera as the output
 cam_rgb = pipeline.createColorCamera()
 cam_rgb.setPreviewSize(300, 300)  # 300x300 will be the preview frame size, available as 'preview' output of the node
-cam_rgb.setCamId(0)  # Camera ID is the socket that the camera is connected to. Default for RBG is 0
-cam_rgb.setResolution(depthai.ColorCameraProperties.SensorResolution.THE_1080_P)
 cam_rgb.setInterleaved(False)
 
 # Next, we want a neural network that will produce the detections

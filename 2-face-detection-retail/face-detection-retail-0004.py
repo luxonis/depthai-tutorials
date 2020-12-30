@@ -7,8 +7,6 @@ pipeline = depthai.Pipeline()
 
 cam_rgb = pipeline.createColorCamera()
 cam_rgb.setPreviewSize(300, 300)
-cam_rgb.setCamId(0)
-cam_rgb.setResolution(depthai.ColorCameraProperties.SensorResolution.THE_1080_P)
 cam_rgb.setInterleaved(False)
 
 detection_nn = pipeline.createNeuralNetwork()
