@@ -53,7 +53,7 @@ while True:
         bboxes = np.array(in_nn.getFirstLayerFp16())
         bboxes = bboxes[:np.where(bboxes == -1)[0][0]]
         bboxes = bboxes.reshape((bboxes.size // 7, 7))
-        bboxes = bboxes[bboxes[:, 2] > 0.5][:, 3:7]
+        bboxes = bboxes[bboxes[:, 2] > 0.8][:, 3:7]
 
     if frame is not None:
         for raw_bbox in bboxes:
