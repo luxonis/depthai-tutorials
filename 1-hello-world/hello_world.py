@@ -31,12 +31,8 @@ xout_nn = pipeline.createXLinkOut()
 xout_nn.setStreamName("nn")
 detection_nn.out.link(xout_nn.input)
 
-# Pipeline is now finished, and we need to find an available device to run it
-found, device_info = depthai.XLinkConnection.getFirstDevice(depthai.XLinkDeviceState.X_LINK_UNBOOTED)
-if not found:
-    raise RuntimeError("Device not found")
-# When the device is found, we initialize it with our pipeline
-device = depthai.Device(pipeline, device_info)
+# Pipeline is now finished, and we need to find an available device to run our pipeline
+device = depthai.Device(pipeline)
 # And start. From this point, the Device will be in "running" mode and will start sending data via XLink
 device.startPipeline()
 
