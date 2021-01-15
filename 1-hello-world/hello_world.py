@@ -19,6 +19,30 @@ if pipeline is None:
 
 detections = []
 
+mobilenet_labels = [
+    "background",
+    "aeroplane",
+    "bicycle",
+    "bird",
+    "boat",
+    "bottle",
+    "bus",
+    "car",
+    "cat",
+    "chair",
+    "cow",
+    "diningtable",
+    "dog",
+    "horse",
+    "motorbike",
+    "person",
+    "pottedplant",
+    "sheep",
+    "sofa",
+    "train",
+    "tvmonitor"
+]
+
 while True:
     # Retrieve data packets from the device.
     # A data packet contains the video frame data.
@@ -43,8 +67,13 @@ while True:
             for detection in detections:
                 pt1 = int(detection.x_min * img_w), int(detection.y_min * img_h)
                 pt2 = int(detection.x_max * img_w), int(detection.y_max * img_h)
+                label = mobilenet_labels[int(detection.label)]
+                score = int(detection.confidence * 100)
 
                 cv2.rectangle(frame, pt1, pt2, (0, 0, 255), 2)
+                cv2.putText(frame, str(score) + ' ' + label, 
+                            (pt1[0] + 2, pt1[1] + 15),
+                            cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0,255,0), 2)
 
             cv2.imshow('previewout', frame)
         elif packet.stream_name == 'disparity_color':
