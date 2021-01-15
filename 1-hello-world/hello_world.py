@@ -7,7 +7,7 @@ device = depthai.Device('', False)
 
 # Create the pipeline using the 'previewout' stream, establishing the first connection to the device.
 pipeline = device.create_pipeline(config={
-    'streams': ['previewout', 'metaout'],
+    'streams': ['previewout', 'metaout', 'disparity_color'],
     'ai': {
         "blob_file": str(Path('./mobilenet-ssd/mobilenet-ssd.blob').resolve().absolute()),
         "blob_file_config": str(Path('./mobilenet-ssd/mobilenet-ssd.json').resolve().absolute()),
@@ -47,6 +47,9 @@ while True:
                 cv2.rectangle(frame, pt1, pt2, (0, 0, 255), 2)
 
             cv2.imshow('previewout', frame)
+        elif packet.stream_name == 'disparity_color':
+            frame = packet.getData()
+            cv2.imshow('disparity_color', frame)
 
     if cv2.waitKey(1) == ord('q'):
         break
