@@ -50,6 +50,10 @@ while True:
 
     for nnet_packet in nnet_packets:
         detections = list(nnet_packet.getDetectedObjects())
+        if len(detections) > 0:
+            sequence_num = nnet_packet.getMetadata().getSequenceNum()
+            labels = list(mobilenet_labels[int(d.label)] for d in detections)
+            print("Detections for camera frame", sequence_num, ":", labels)
 
     for packet in data_packets:
         # By default, DepthAI adds other streams (notably 'meta_2dh'). Only process `previewout`.
