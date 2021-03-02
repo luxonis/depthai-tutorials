@@ -1,54 +1,63 @@
 from pathlib import Path
+import cv2
+import depthai
+import numpy as np
 
-import cv2  # opencv - display the video stream
-import depthai  # access the camera and its data packets
+pipeline = depthai.Pipeline()
 
-device = depthai.Device('', False)
+cam_rgb = pipeline.createColorCamera()
+cam_rgb.setPreviewSize(300, 300)
+cam_rgb.setInterleaved(False)
 
-# Create the pipeline using the 'previewout' stream, establishing the first connection to the device.
-pipeline = device.create_pipeline(config={
-    'streams': ['previewout', 'metaout'],
-    'ai': {
-        "blob_file": str(Path("./face-detection-retail-0004.blob").resolve().absolute()),
-        "blob_file_config": str(Path("./face-detection-retail-0004.json").resolve().absolute()),
-    }
-})
+detection_nn = pipeline.createNeuralNetwork()
+detection_nn.setBlobPath(str((Path(__file__).parent / Path('face-detection-retail-0004.blob')).resolve().absolute()))
+cam_rgb.preview.link(detection_nn.input)
 
-if pipeline is None:
-    raise RuntimeError('Pipeline creation failed!')
+xout_rgb = pipeline.createXLinkOut()
+xout_rgb.setStreamName("rgb")
+cam_rgb.preview.link(xout_rgb.input)
 
-detections = []
+xout_nn = pipeline.createXLinkOut()
+xout_nn.setStreamName("nn")
+detection_nn.out.link(xout_nn.input)
+
+found, device_info = depthai.XLinkConnection.getFirstDevice(depthai.XLinkDeviceState.X_LINK_UNBOOTED)
+if not found:
+    raise RuntimeError("Device not found")
+device = depthai.Device(pipeline, device_info)
+device.startPipeline()
+
+q_rgb = device.getOutputQueue("rgb")
+q_nn = device.getOutputQueue("nn")
+
+frame = None
+bboxes = []
+
+
+def frame_norm(frame, bbox):
+    return (np.array(bbox) * np.array([*frame.shape[:2], *frame.shape[:2]])[::-1]).astype(int)
+
 
 while True:
-    # Retrieve data packets from the device.
-    # A data packet contains the video frame data.
-    nnet_packets, data_packets = pipeline.get_available_nnet_and_data_packets()
+    in_rgb = q_rgb.tryGet()
+    in_nn = q_nn.tryGet()
 
-    for nnet_packet in nnet_packets:
-        detections = list(nnet_packet.getDetectedObjects())
+    if in_rgb is not None:
+        shape = (3, in_rgb.getHeight(), in_rgb.getWidth())
+        frame = in_rgb.getData().reshape(shape).transpose(1, 2, 0).astype(np.uint8)
+        frame = np.ascontiguousarray(frame)
 
-    for packet in data_packets:
-        # By default, DepthAI adds other streams (notably 'meta_2dh'). Only process `previewout`.
-        if packet.stream_name == 'previewout':
-            data = packet.getData()
-            # change shape (3, 300, 300) -> (300, 300, 3)
-            data0 = data[0, :, :]
-            data1 = data[1, :, :]
-            data2 = data[2, :, :]
-            frame = cv2.merge([data0, data1, data2])
+    if in_nn is not None:
+        bboxes = np.array(in_nn.getFirstLayerFp16())
+        bboxes = bboxes[:np.where(bboxes == -1)[0][0]]
+        bboxes = bboxes.reshape((bboxes.size // 7, 7))
+        bboxes = bboxes[bboxes[:, 2] > 0.8][:, 3:7]
 
-            img_h = frame.shape[0]
-            img_w = frame.shape[1]
-
-            for e in detections:
-                pt1 = int(e.x_min * img_w), int(e.y_min * img_h)
-                pt2 = int(e.x_max * img_w), int(e.y_max * img_h)
-
-                cv2.rectangle(frame, pt1, pt2, (0, 0, 255), 2)
-
-            cv2.imshow('previewout', frame)
+    if frame is not None:
+        for raw_bbox in bboxes:
+            bbox = frame_norm(frame, raw_bbox)
+            cv2.rectangle(frame, (bbox[0], bbox[1]), (bbox[2], bbox[3]), (255, 0, 0), 2)
+        cv2.imshow("preview", frame)
 
     if cv2.waitKey(1) == ord('q'):
         break
-
-del device
