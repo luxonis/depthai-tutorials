@@ -32,61 +32,62 @@ xout_nn.setStreamName("nn")
 detection_nn.out.link(xout_nn.input)
 
 # Pipeline is now finished, and we need to find an available device to run our pipeline
-device = depthai.Device(pipeline)
-# And start. From this point, the Device will be in "running" mode and will start sending data via XLink
-device.startPipeline()
+# we are using context manager here that will dispose the device after we stop using it
+with depthai.Device(pipeline) as device:
+    # And start. From this point, the Device will be in "running" mode and will start sending data via XLink
+    device.startPipeline()
 
-# To consume the device results, we get two output queues from the device, with stream names we assigned earlier
-q_rgb = device.getOutputQueue("rgb")
-q_nn = device.getOutputQueue("nn")
+    # To consume the device results, we get two output queues from the device, with stream names we assigned earlier
+    q_rgb = device.getOutputQueue("rgb")
+    q_nn = device.getOutputQueue("nn")
 
-# Here, some of the default values are defined. Frame will be an image from "rgb" stream, bboxes will contain nn results
-frame = None
-bboxes = []
-
-
-# Since the bboxes returned by nn have values from <0..1> range, they need to be multiplied by frame width/height to
-# receive the actual position of the bounding box on the image
-def frame_norm(frame, bbox):
-    return (np.array(bbox) * np.array([*frame.shape[:2], *frame.shape[:2]])[::-1]).astype(int)
+    # Here, some of the default values are defined. Frame will be an image from "rgb" stream, bboxes will contain nn results
+    frame = None
+    bboxes = []
 
 
-# Main host-side application loop
-while True:
-    # we try to fetch the data from nn/rgb queues. tryGet will return either the data packet or None if there isn't any
-    in_rgb = q_rgb.tryGet()
-    in_nn = q_nn.tryGet()
+    # Since the bboxes returned by nn have values from <0..1> range, they need to be multiplied by frame width/height to
+    # receive the actual position of the bounding box on the image
+    def frame_norm(frame, bbox):
+        return (np.array(bbox) * np.array([*frame.shape[:2], *frame.shape[:2]])[::-1]).astype(int)
 
-    if in_rgb is not None:
-        # When data from rgb stream is received, we need to transform it from 1D flat array into 3 x height x width one
-        shape = (3, in_rgb.getHeight(), in_rgb.getWidth())
-        # Also, the array is transformed from CHW form into HWC
-        frame = in_rgb.getData().reshape(shape).transpose(1, 2, 0).astype(np.uint8)
-        frame = np.ascontiguousarray(frame)
 
-    if in_nn is not None:
-        # when data from nn is received, it is also represented as a 1D array initially, just like rgb frame
-        bboxes = np.array(in_nn.getFirstLayerFp16())
-        # the nn detections array is a fixed-size (and very long) array. The actual data from nn is available from the
-        # beginning of an array, and is finished with -1 value, after which the array is filled with 0
-        # We need to crop the array so that only the data from nn are left
-        bboxes = bboxes[:np.where(bboxes == -1)[0][0]]
-        # next, the single NN results consists of 7 values: id, label, confidence, x_min, y_min, x_max, y_max
-        # that's why we reshape the array from 1D into 2D array - where each row is a nn result with 7 columns
-        bboxes = bboxes.reshape((bboxes.size // 7, 7))
-        # Finally, we want only these results, which confidence (ranged <0..1>) is greater than 0.8, and we are only
-        # interested in bounding boxes (so last 4 columns)
-        bboxes = bboxes[bboxes[:, 2] > 0.8][:, 3:7]
+    # Main host-side application loop
+    while True:
+        # we try to fetch the data from nn/rgb queues. tryGet will return either the data packet or None if there isn't any
+        in_rgb = q_rgb.tryGet()
+        in_nn = q_nn.tryGet()
 
-    if frame is not None:
-        for raw_bbox in bboxes:
-            # for each bounding box, we first normalize it to match the frame size
-            bbox = frame_norm(frame, raw_bbox)
-            # and then draw a rectangle on the frame to show the actual result
-            cv2.rectangle(frame, (bbox[0], bbox[1]), (bbox[2], bbox[3]), (255, 0, 0), 2)
-        # After all the drawing is finished, we show the frame on the screen
-        cv2.imshow("preview", frame)
+        if in_rgb is not None:
+            # When data from rgb stream is received, we need to transform it from 1D flat array into 3 x height x width one
+            shape = (3, in_rgb.getHeight(), in_rgb.getWidth())
+            # Also, the array is transformed from CHW form into HWC
+            frame = in_rgb.getData().reshape(shape).transpose(1, 2, 0).astype(np.uint8)
+            frame = np.ascontiguousarray(frame)
 
-    # at any time, you can press "q" and exit the main loop, therefore exiting the program itself
-    if cv2.waitKey(1) == ord('q'):
-        break
+        if in_nn is not None:
+            # when data from nn is received, it is also represented as a 1D array initially, just like rgb frame
+            bboxes = np.array(in_nn.getFirstLayerFp16())
+            # the nn detections array is a fixed-size (and very long) array. The actual data from nn is available from the
+            # beginning of an array, and is finished with -1 value, after which the array is filled with 0
+            # We need to crop the array so that only the data from nn are left
+            bboxes = bboxes[:np.where(bboxes == -1)[0][0]]
+            # next, the single NN results consists of 7 values: id, label, confidence, x_min, y_min, x_max, y_max
+            # that's why we reshape the array from 1D into 2D array - where each row is a nn result with 7 columns
+            bboxes = bboxes.reshape((bboxes.size // 7, 7))
+            # Finally, we want only these results, which confidence (ranged <0..1>) is greater than 0.8, and we are only
+            # interested in bounding boxes (so last 4 columns)
+            bboxes = bboxes[bboxes[:, 2] > 0.8][:, 3:7]
+
+        if frame is not None:
+            for raw_bbox in bboxes:
+                # for each bounding box, we first normalize it to match the frame size
+                bbox = frame_norm(frame, raw_bbox)
+                # and then draw a rectangle on the frame to show the actual result
+                cv2.rectangle(frame, (bbox[0], bbox[1]), (bbox[2], bbox[3]), (255, 0, 0), 2)
+            # After all the drawing is finished, we show the frame on the screen
+            cv2.imshow("preview", frame)
+
+        # at any time, you can press "q" and exit the main loop, therefore exiting the program itself
+        if cv2.waitKey(1) == ord('q'):
+            break
