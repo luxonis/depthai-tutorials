@@ -1,5 +1,7 @@
 # first, import all necessary modules
 from pathlib import Path
+
+import blobconverter
 import cv2
 import depthai
 import numpy as np
@@ -13,9 +15,12 @@ cam_rgb.setPreviewSize(300, 300)  # 300x300 will be the preview frame size, avai
 cam_rgb.setInterleaved(False)
 
 # Next, we want a neural network that will produce the detections
-detection_nn = pipeline.createNeuralNetwork()
+detection_nn = pipeline.createMobileNetDetectionNetwork()
 # Blob is the Neural Network file, compiled for MyriadX. It contains both the definition and weights of the model
-detection_nn.setBlobPath(str((Path(__file__).parent / Path('mobilenet-ssd/mobilenet-ssd.blob')).resolve().absolute()))
+# We're using a blobconverter tool to retreive the MobileNetSSD blob automatically from OpenVINO Model Zoo
+detection_nn.setBlobPath(str(blobconverter.from_zoo(name='mobilenet-ssd', shaves=6)))
+# Next, we filter out the detections that are below a confidence threshold. Confidence can be anywhere between <0..1>
+detection_nn.setConfidenceThreshold(0.5)
 # Next, we link the camera 'preview' output to the neural network detection input, so that it can produce detections
 cam_rgb.preview.link(detection_nn.input)
 
@@ -34,22 +39,22 @@ detection_nn.out.link(xout_nn.input)
 # Pipeline is now finished, and we need to find an available device to run our pipeline
 # we are using context manager here that will dispose the device after we stop using it
 with depthai.Device(pipeline) as device:
-    # And start. From this point, the Device will be in "running" mode and will start sending data via XLink
-    device.startPipeline()
+    # From this point, the Device will be in "running" mode and will start sending data via XLink
 
     # To consume the device results, we get two output queues from the device, with stream names we assigned earlier
     q_rgb = device.getOutputQueue("rgb")
     q_nn = device.getOutputQueue("nn")
 
-    # Here, some of the default values are defined. Frame will be an image from "rgb" stream, bboxes will contain nn results
+    # Here, some of the default values are defined. Frame will be an image from "rgb" stream, detections will contain nn results
     frame = None
-    bboxes = []
+    detections = []
 
-
-    # Since the bboxes returned by nn have values from <0..1> range, they need to be multiplied by frame width/height to
+    # Since the detections returned by nn have values from <0..1> range, they need to be multiplied by frame width/height to
     # receive the actual position of the bounding box on the image
-    def frame_norm(frame, bbox):
-        return (np.array(bbox) * np.array([*frame.shape[:2], *frame.shape[:2]])[::-1]).astype(int)
+    def frameNorm(frame, bbox):
+        normVals = np.full(len(bbox), frame.shape[0])
+        normVals[::2] = frame.shape[1]
+        return (np.clip(np.array(bbox), 0, 1) * normVals).astype(int)
 
 
     # Main host-side application loop
@@ -59,30 +64,17 @@ with depthai.Device(pipeline) as device:
         in_nn = q_nn.tryGet()
 
         if in_rgb is not None:
-            # When data from rgb stream is received, we need to transform it from 1D flat array into 3 x height x width one
-            shape = (3, in_rgb.getHeight(), in_rgb.getWidth())
-            # Also, the array is transformed from CHW form into HWC
-            frame = in_rgb.getData().reshape(shape).transpose(1, 2, 0).astype(np.uint8)
-            frame = np.ascontiguousarray(frame)
+            # If the packet from RGB camera is present, we're retrieving the frame in OpenCV format using getCvFrame
+            frame = in_rgb.getCvFrame()
 
         if in_nn is not None:
-            # when data from nn is received, it is also represented as a 1D array initially, just like rgb frame
-            bboxes = np.array(in_nn.getFirstLayerFp16())
-            # the nn detections array is a fixed-size (and very long) array. The actual data from nn is available from the
-            # beginning of an array, and is finished with -1 value, after which the array is filled with 0
-            # We need to crop the array so that only the data from nn are left
-            bboxes = bboxes[:np.where(bboxes == -1)[0][0]]
-            # next, the single NN results consists of 7 values: id, label, confidence, x_min, y_min, x_max, y_max
-            # that's why we reshape the array from 1D into 2D array - where each row is a nn result with 7 columns
-            bboxes = bboxes.reshape((bboxes.size // 7, 7))
-            # Finally, we want only these results, which confidence (ranged <0..1>) is greater than 0.8, and we are only
-            # interested in bounding boxes (so last 4 columns)
-            bboxes = bboxes[bboxes[:, 2] > 0.8][:, 3:7]
+            # when data from nn is received, we take the detections array that contains mobilenet-ssd results
+            detections = in_nn.detections
 
         if frame is not None:
-            for raw_bbox in bboxes:
+            for detection in detections:
                 # for each bounding box, we first normalize it to match the frame size
-                bbox = frame_norm(frame, raw_bbox)
+                bbox = frameNorm(frame, (detection.xmin, detection.ymin, detection.xmax, detection.ymax))
                 # and then draw a rectangle on the frame to show the actual result
                 cv2.rectangle(frame, (bbox[0], bbox[1]), (bbox[2], bbox[3]), (255, 0, 0), 2)
             # After all the drawing is finished, we show the frame on the screen
