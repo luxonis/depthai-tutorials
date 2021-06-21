@@ -9,8 +9,9 @@ cam_rgb = pipeline.createColorCamera()
 cam_rgb.setPreviewSize(300, 300)
 cam_rgb.setInterleaved(False)
 
-detection_nn = pipeline.createNeuralNetwork()
+detection_nn = pipeline.createMobileNetDetectionNetwork()
 detection_nn.setBlobPath(str((Path(__file__).parent / Path('face-detection-retail-0004.blob')).resolve().absolute()))
+detection_nn.setConfidenceThreshold(0.5)
 cam_rgb.preview.link(detection_nn.input)
 
 xout_rgb = pipeline.createXLinkOut()
@@ -21,24 +22,20 @@ xout_nn = pipeline.createXLinkOut()
 xout_nn.setStreamName("nn")
 detection_nn.out.link(xout_nn.input)
 
-found, device_info = depthai.XLinkConnection.getFirstDevice(depthai.XLinkDeviceState.X_LINK_UNBOOTED)
-if not found:
-    raise RuntimeError("Device not found")
-
 # Pipeline is now finished, and we need to find an available device to run our pipeline
 # we are using context manager here that will dispose the device after we stop using it
-with depthai.Device(pipeline, device_info) as device:
-    device.startPipeline()
-
+with depthai.Device(pipeline) as device:
     q_rgb = device.getOutputQueue("rgb")
     q_nn = device.getOutputQueue("nn")
 
     frame = None
-    bboxes = []
+    detections = []
 
 
-    def frame_norm(frame, bbox):
-        return (np.array(bbox) * np.array([*frame.shape[:2], *frame.shape[:2]])[::-1]).astype(int)
+    def frameNorm(frame, bbox):
+        normVals = np.full(len(bbox), frame.shape[0])
+        normVals[::2] = frame.shape[1]
+        return (np.clip(np.array(bbox), 0, 1) * normVals).astype(int)
 
 
     while True:
@@ -46,19 +43,14 @@ with depthai.Device(pipeline, device_info) as device:
         in_nn = q_nn.tryGet()
 
         if in_rgb is not None:
-            shape = (3, in_rgb.getHeight(), in_rgb.getWidth())
-            frame = in_rgb.getData().reshape(shape).transpose(1, 2, 0).astype(np.uint8)
-            frame = np.ascontiguousarray(frame)
+            frame = in_rgb.getCvFrame()
 
         if in_nn is not None:
-            bboxes = np.array(in_nn.getFirstLayerFp16())
-            bboxes = bboxes[:np.where(bboxes == -1)[0][0]]
-            bboxes = bboxes.reshape((bboxes.size // 7, 7))
-            bboxes = bboxes[bboxes[:, 2] > 0.8][:, 3:7]
+            detections = in_nn.detections
 
         if frame is not None:
-            for raw_bbox in bboxes:
-                bbox = frame_norm(frame, raw_bbox)
+            for detection in detections:
+                bbox = frameNorm(frame, (detection.xmin, detection.ymin, detection.xmax, detection.ymax))
                 cv2.rectangle(frame, (bbox[0], bbox[1]), (bbox[2], bbox[3]), (255, 0, 0), 2)
             cv2.imshow("preview", frame)
 
