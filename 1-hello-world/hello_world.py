@@ -17,7 +17,7 @@ cam_rgb.setInterleaved(False)
 # Next, we want a neural network that will produce the detections
 detection_nn = pipeline.createMobileNetDetectionNetwork()
 # Blob is the Neural Network file, compiled for MyriadX. It contains both the definition and weights of the model
-# We're using a blobconverter tool to retreive the MobileNetSSD blob automatically from OpenVINO Model Zoo
+# We're using a blobconverter tool to retrieve the MobileNetSSD blob automatically from OpenVINO Model Zoo
 detection_nn.setBlobPath(blobconverter.from_zoo(name='mobilenet-ssd', shaves=6))
 # Next, we filter out the detections that are below a confidence threshold. Confidence can be anywhere between <0..1>
 detection_nn.setConfidenceThreshold(0.5)
